@@ -1,5 +1,7 @@
 # RG.AutoException
 
+[![NuGet](https://img.shields.io/nuget/v/RG.AutoException.svg)](https://www.nuget.org/packages/RG.AutoException/)
+
 Generate exceptions as you type.
 
 Just type:

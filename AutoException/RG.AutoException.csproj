@@ -6,12 +6,26 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
 		<Nullable>enable</Nullable>
+		<Version>1.0.0</Version>
+		<Authors>Ronny Gunawan</Authors>
+		<Company>Ronny Gunawan</Company>
+		<Description>Generate exceptions as you type</Description>
+		<Copyright>(C) 2022 Ronny Gunawan</Copyright>
+		<PackageProjectUrl>https://github.com/ronnygunawan/RG.AutoException</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/ronnygunawan/RG.AutoException</RepositoryUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.4.0" PrivateAssets="all" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
 		<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+		<None Include="..\README.md">
+		  <Pack>True</Pack>
+		  <PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
 
 </Project>
