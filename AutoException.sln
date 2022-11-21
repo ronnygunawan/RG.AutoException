@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33103.201
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RG.AutoException", "AutoException\RG.AutoException.csproj", "{72C5AAB0-3ADB-4DCE-8E60-18E355056861}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestApp", "TestApp\TestApp.csproj", "{3CF62DA7-FC28-4A75-9F35-C0D38D770CE0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{72C5AAB0-3ADB-4DCE-8E60-18E355056861}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72C5AAB0-3ADB-4DCE-8E60-18E355056861}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72C5AAB0-3ADB-4DCE-8E60-18E355056861}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72C5AAB0-3ADB-4DCE-8E60-18E355056861}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3CF62DA7-FC28-4A75-9F35-C0D38D770CE0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3CF62DA7-FC28-4A75-9F35-C0D38D770CE0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3CF62DA7-FC28-4A75-9F35-C0D38D770CE0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3CF62DA7-FC28-4A75-9F35-C0D38D770CE0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {73FD24B8-9F74-4345-876B-97A743538915}
+	EndGlobalSection
+EndGlobal
