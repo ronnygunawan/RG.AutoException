@@ -7,6 +7,7 @@ namespace RG.AutoException.Internals
     internal class ThrowSyntaxReceiver : ISyntaxContextReceiver
     {
         public HashSet<string> MissingExceptions = new();
+        private readonly HashSet<string> _knownExceptions = new();
 
         public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
         {
@@ -19,7 +20,11 @@ namespace RG.AutoException.Internals
                         ArgumentList.Arguments.Count: 0,
                         Type: IdentifierNameSyntax { Identifier.ValueText: string exceptionName } typeSyntax
                     }
-                } throwExpressionSyntax when (exceptionName.EndsWith("Exception") && !exceptionName.Contains(".") && context.SemanticModel.GetSymbolInfo(typeSyntax).Symbol is null):
+                } throwExpressionSyntax
+                when _knownExceptions.Add(exceptionName)
+                && (exceptionName.EndsWith("Exception")
+                && !exceptionName.Contains(".")
+                && context.SemanticModel.GetSymbolInfo(typeSyntax).Symbol is null):
                     MissingExceptions.Add(exceptionName);
                     break;
                 case ThrowStatementSyntax
@@ -29,7 +34,11 @@ namespace RG.AutoException.Internals
                         ArgumentList.Arguments.Count: 0,
                         Type: IdentifierNameSyntax { Identifier.ValueText: string exceptionName } typeSyntax
                     }
-                } throwStatementSyntax when(exceptionName.EndsWith("Exception") && !exceptionName.Contains(".") && context.SemanticModel.GetSymbolInfo(typeSyntax).Symbol is null):
+                } throwStatementSyntax
+                when _knownExceptions.Add(exceptionName)
+                && exceptionName.EndsWith("Exception")
+                && !exceptionName.Contains(".")
+                && context.SemanticModel.GetSymbolInfo(typeSyntax).Symbol is null:
                     MissingExceptions.Add(exceptionName);
                     break;
             }

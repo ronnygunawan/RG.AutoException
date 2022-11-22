@@ -14,7 +14,7 @@ namespace RG.AutoException
 #if DEBUG
             if (!Debugger.IsAttached)
             {
-                //Debugger.Launch();
+                Debugger.Launch();
             }
 #endif
             context.RegisterForSyntaxNotifications(() => new ThrowSyntaxReceiver());

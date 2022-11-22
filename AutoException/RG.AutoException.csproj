@@ -6,7 +6,7 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
 		<Nullable>enable</Nullable>
-		<Version>1.0.0</Version>
+		<Version>1.0.1</Version>
 		<Authors>Ronny Gunawan</Authors>
 		<Company>Ronny Gunawan</Company>
 		<Description>Generate exceptions as you type</Description>

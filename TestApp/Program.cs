@@ -12,7 +12,7 @@ namespace TestApp
             }
             catch (HelloWorldException)
             {
-
+                throw new KeyNotFoundException();
             }
         }
     }
