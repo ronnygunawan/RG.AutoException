@@ -599,6 +599,155 @@ public class ExceptionGeneratorTests
         generatedCode.ShouldContain("public int? AttemptedValue { get; init; }");
     }
 
+    [Fact]
+    public void GeneratesExceptionWithKeyNotFoundExceptionBase()
+    {
+        // Arrange
+        string source = """
+            using System;
+            using System.Collections.Generic;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (KeyNotFoundException)new ItemNotFoundException("Item not found");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with KeyNotFoundException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("ItemNotFoundException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class ItemNotFoundException : KeyNotFoundException");
+        // Verify dynamically extracted constructors
+        generatedCode.ShouldContain("public ItemNotFoundException() : base() { }");
+        generatedCode.ShouldContain("public ItemNotFoundException(string? message) : base(message) { }");
+        generatedCode.ShouldContain("public ItemNotFoundException(string? message, Exception? innerException) : base(message, innerException) { }");
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithInvalidProgramExceptionBase()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (InvalidProgramException)new CorruptedStateException("Program is corrupt");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with InvalidProgramException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("CorruptedStateException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class CorruptedStateException : InvalidProgramException");
+        // InvalidProgramException has basic constructors - dynamically extracted from the actual type
+        generatedCode.ShouldContain("public CorruptedStateException() : base() { }");
+        generatedCode.ShouldContain("public CorruptedStateException(string? message) : base(message) { }");
+        // Note: InvalidProgramException does not have a (string, Exception) constructor in .NET
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithHttpRequestExceptionBase()
+    {
+        // Arrange
+        string source = """
+            using System;
+            using System.Net.Http;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (HttpRequestException)new ApiCallFailedException("API call failed");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGeneratorWithHttp(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with HttpRequestException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("ApiCallFailedException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class ApiCallFailedException : HttpRequestException");
+        // HttpRequestException has constructors that include statusCode - dynamically extracted
+        generatedCode.ShouldContain("public ApiCallFailedException() : base() { }");
+        generatedCode.ShouldContain("public ApiCallFailedException(string? message) : base(message) { }");
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithInvalidCastExceptionBase()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (InvalidCastException)new TypeConversionException("Cannot convert type");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with InvalidCastException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("TypeConversionException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class TypeConversionException : InvalidCastException");
+        // InvalidCastException has standard Exception constructors plus an int errorCode one
+        generatedCode.ShouldContain("public TypeConversionException() : base() { }");
+        generatedCode.ShouldContain("public TypeConversionException(string? message) : base(message) { }");
+        generatedCode.ShouldContain("public TypeConversionException(string? message, Exception? innerException) : base(message, innerException) { }");
+    }
+
     private static (Compilation, ImmutableArray<Diagnostic>) RunGenerator(string source)
     {
         SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source);
@@ -613,6 +762,39 @@ public class ExceptionGeneratorTests
         // Add runtime references
         string runtimePath = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimePath, "System.Runtime.dll")));
+
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            "TestCompilation",
+            [syntaxTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var generator = new ExceptionGenerator();
+
+        CSharpGeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+
+        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out Compilation outputCompilation,
+            out ImmutableArray<Diagnostic> diagnostics);
+
+        return (outputCompilation, diagnostics);
+    }
+
+    private static (Compilation, ImmutableArray<Diagnostic>) RunGeneratorWithHttp(string source)
+    {
+        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source);
+
+        string runtimePath = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        
+        List<MetadataReference> references =
+        [
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Exception).Assembly.Location),
+            MetadataReference.CreateFromFile(Path.Combine(runtimePath, "System.Runtime.dll")),
+            MetadataReference.CreateFromFile(Path.Combine(runtimePath, "System.Net.Http.dll")),
+        ];
 
         CSharpCompilation compilation = CSharpCompilation.Create(
             "TestCompilation",
