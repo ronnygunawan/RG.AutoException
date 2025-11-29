@@ -37,7 +37,12 @@ namespace RG.AutoException
 
                             namespace GeneratedExceptions
                             {
-                                public sealed class {{exceptionName}} : Exception { }
+                                public sealed class {{exceptionName}} : Exception
+                                {
+                                    public {{exceptionName}}() : base() { }
+                                    public {{exceptionName}}(string message) : base(message) { }
+                                    public {{exceptionName}}(string message, Exception innerException) : base(message, innerException) { }
+                                }
                             }
                             """,
                             encoding: Encoding.UTF8
@@ -50,8 +55,8 @@ namespace RG.AutoException
         {
             return node switch
             {
-                ThrowExpressionSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Type: IdentifierNameSyntax } } => true,
-                ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Type: IdentifierNameSyntax } } => true,
+                ThrowExpressionSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: <= 2, Type: IdentifierNameSyntax } } => true,
+                ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: <= 2, Type: IdentifierNameSyntax } } => true,
                 _ => false
             };
         }
