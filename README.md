@@ -15,6 +15,18 @@ using System;
 
 namespace GeneratedExceptions
 {
-    public sealed class StupidUserException : Exception { }
+    public sealed class StupidUserException : Exception
+    {
+        public StupidUserException() : base() { }
+        public StupidUserException(string message) : base(message) { }
+        public StupidUserException(string message, Exception innerException) : base(message, innerException) { }
+    }
 }
+```
+
+All three standard exception constructors are generated, allowing you to use any of these patterns:
+```cs
+throw new StupidUserException();
+throw new StupidUserException("Something went wrong");
+throw new StupidUserException("Something went wrong", innerException);
 ```

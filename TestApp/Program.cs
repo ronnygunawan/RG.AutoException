@@ -10,9 +10,16 @@ namespace TestApp
             {
                 throw new HelloWorldException();
             }
-            catch (HelloWorldException)
+            catch (HelloWorldException ex)
             {
-                throw new KeyNotFoundException();
+                try
+                {
+                    throw new AnotherTestException("Error message");
+                }
+                catch (AnotherTestException ex2)
+                {
+                    throw new WrappedException("Wrapped error", ex2);
+                }
             }
         }
     }
