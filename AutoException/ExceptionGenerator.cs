@@ -44,7 +44,15 @@ namespace RG.AutoException
             public override bool Equals(object? obj) =>
                 obj is ExceptionInfo other && Name == other.Name && Properties.SequenceEqual(other.Properties);
 
-            public override int GetHashCode() => Name.GetHashCode();
+            public override int GetHashCode()
+            {
+                int hash = Name.GetHashCode();
+                foreach (PropertyInfo prop in Properties)
+                {
+                    hash = (hash * 397) ^ prop.GetHashCode();
+                }
+                return hash;
+            }
         }
 
         // Primitive types that are supported for init-only properties
