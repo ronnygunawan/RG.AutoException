@@ -462,8 +462,8 @@ namespace RG.AutoException
                 _ => ImmutableArray.Create(
                     // Default constructors for Exception or unknown types
                     new BaseClassConstructorInfo("", ""),
-                    new BaseClassConstructorInfo("string message", "message"),
-                    new BaseClassConstructorInfo("string message, Exception innerException", "message, innerException")
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
                 )
             };
         }

@@ -39,8 +39,8 @@ public class ExceptionGeneratorTests
         string generatedCode = generatedSyntaxTree.GetText().ToString();
         generatedCode.ShouldContain("public sealed class MyTestException : Exception");
         generatedCode.ShouldContain("public MyTestException() : base() { }");
-        generatedCode.ShouldContain("public MyTestException(string message) : base(message) { }");
-        generatedCode.ShouldContain("public MyTestException(string message, Exception innerException) : base(message, innerException) { }");
+        generatedCode.ShouldContain("public MyTestException(string? message) : base(message) { }");
+        generatedCode.ShouldContain("public MyTestException(string? message, Exception? innerException) : base(message, innerException) { }");
     }
 
     [Fact]
