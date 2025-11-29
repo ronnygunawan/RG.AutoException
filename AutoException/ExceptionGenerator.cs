@@ -95,17 +95,9 @@ namespace RG.AutoException
             // Register the source output
             context.RegisterSourceOutput(mergedExceptions, static (ctx, exceptions) =>
             {
-                bool hasConflictingType = false;
-
                 foreach (ExceptionInfo exceptionInfo in exceptions)
                 {
                     string propertiesSource = GenerateProperties(exceptionInfo.Properties);
-
-                    // Check if any property has ConflictingType
-                    if (exceptionInfo.Properties.Any(p => p.TypeName == "ConflictingType"))
-                    {
-                        hasConflictingType = true;
-                    }
 
                     ctx.AddSource(
                         hintName: exceptionInfo.Name,
@@ -121,29 +113,6 @@ namespace RG.AutoException
                                     public {{exceptionInfo.Name}}(string message) : base(message) { }
                                     public {{exceptionInfo.Name}}(string message, Exception innerException) : base(message, innerException) { }
                             {{propertiesSource}}
-                                }
-                            }
-                            """,
-                            encoding: Encoding.UTF8
-                        ));
-                }
-
-                // Generate ConflictingType class if needed
-                if (hasConflictingType)
-                {
-                    ctx.AddSource(
-                        hintName: "ConflictingType",
-                        sourceText: SourceText.From(
-                            """
-                            namespace GeneratedExceptions
-                            {
-                                /// <summary>
-                                /// This type indicates that a property has conflicting types across different usages.
-                                /// Review the code and ensure consistent property types are used.
-                                /// </summary>
-                                public sealed class ConflictingType
-                                {
-                                    private ConflictingType() { }
                                 }
                             }
                             """,

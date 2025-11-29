@@ -165,7 +165,7 @@ public class ExceptionGeneratorTests
     }
 
     [Fact]
-    public void GeneratesConflictingTypeForMismatchedTypes()
+    public void DoesNotGeneratePropertyForConflictingTypes()
     {
         // Arrange
         string source = """
@@ -195,23 +195,22 @@ public class ExceptionGeneratorTests
         // Act
         var (compilation, diagnostics) = RunGenerator(source);
 
-        // Assert - We expect errors because ConflictingType can't be assigned
-        // but the generated code should contain ConflictingType
+        // Assert - The exception should be generated
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictException"));
         generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
         generatedCode.ShouldContain("public sealed class ConflictException : Exception");
+        
+        // The property should use ConflictingType which doesn't exist,
+        // causing a natural compilation error that guides the user
         generatedCode.ShouldContain("public ConflictingType? Id { get; init; }");
 
-        // Verify ConflictingType is also generated
+        // ConflictingType class should NOT be generated - let compilation fail naturally
         var conflictingTypeSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictingType") && !st.FilePath.Contains("ConflictException"));
-        conflictingTypeSyntaxTree.ShouldNotBeNull();
-
-        string conflictingTypeCode = conflictingTypeSyntaxTree.GetText().ToString();
-        conflictingTypeCode.ShouldContain("public sealed class ConflictingType");
+        conflictingTypeSyntaxTree.ShouldBeNull();
     }
 
     [Fact]

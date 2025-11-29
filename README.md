@@ -90,7 +90,7 @@ throw new UserException { Age = 25 };
 
 ### Conflicting Property Types
 
-If the same property is used with different types across usages, a `ConflictingType` placeholder is generated:
+If the same property is used with different types across usages, a `ConflictingType` placeholder type is used for the property:
 
 ```cs
 // First usage
@@ -103,4 +103,4 @@ throw new UserException { Id = 1024 };
 // public ConflictingType? Id { get; init; }
 ```
 
-This will result in compilation errors, prompting you to use consistent types for the property.
+Since `ConflictingType` doesn't exist, this will result in a compilation error, prompting you to use consistent types for the property.
