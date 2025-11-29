@@ -195,6 +195,9 @@ public class ExceptionGeneratorTests
         // Act
         var (compilation, diagnostics) = RunGenerator(source);
 
+        // Assert - Generator diagnostics should be empty (generator runs successfully)
+        diagnostics.ShouldBeEmpty();
+
         // Assert - The exception should be generated
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictException"));
@@ -211,6 +214,11 @@ public class ExceptionGeneratorTests
         var conflictingTypeSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictingType") && !st.FilePath.Contains("ConflictException"));
         conflictingTypeSyntaxTree.ShouldBeNull();
+
+        // Assert - Compilation should fail because ConflictingType doesn't exist
+        var compilationDiagnostics = compilation.GetDiagnostics();
+        compilationDiagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldNotBeEmpty();
+        compilationDiagnostics.ShouldContain(d => d.Id == "CS0246" && d.GetMessage().Contains("ConflictingType"));
     }
 
     [Fact]
@@ -243,8 +251,8 @@ public class ExceptionGeneratorTests
         // Act
         var (compilation, diagnostics) = RunGenerator(source);
 
-        // Assert
-        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
 
         // Verify the generated exception has all primitive type properties
         var generatedSyntaxTree = compilation.SyntaxTrees
