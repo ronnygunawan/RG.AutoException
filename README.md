@@ -104,3 +104,60 @@ throw new UserException { Id = 1024 };
 ```
 
 Since `ConflictingType` doesn't exist, this will result in a compilation error, prompting you to use consistent types for the property.
+
+## Specifying Base Exception Class
+
+By default, generated exceptions inherit from `Exception`. You can specify a different base class using an explicit cast expression:
+
+```cs
+throw (ArgumentException)new StupidUserException("That's not how you use it", nameof(name));
+```
+
+This will generate an exception that inherits from `ArgumentException`:
+
+```cs
+using System;
+
+namespace GeneratedExceptions
+{
+    public sealed class StupidUserException : ArgumentException
+    {
+        public StupidUserException() : base() { }
+        public StupidUserException(string? message) : base(message) { }
+        public StupidUserException(string? message, Exception? innerException) : base(message, innerException) { }
+        public StupidUserException(string? message, string? paramName) : base(message, paramName) { }
+        public StupidUserException(string? message, string? paramName, Exception? innerException) : base(message, paramName, innerException) { }
+    }
+}
+```
+
+The generated exception will include all public constructors from the specified base class.
+
+### Combining Base Class with Properties
+
+You can combine base class specification with init-only properties:
+
+```cs
+throw (ArgumentException)new DetailedArgumentException("error", "param")
+{
+    FieldName = "username",
+    AttemptedValue = 42
+};
+```
+
+### Conflicting Base Class Specifications
+
+If the same exception is used with different base classes, a `ConflictingType` placeholder is used:
+
+```cs
+// First usage
+throw (ArgumentException)new ConflictBaseException();
+
+// Second usage
+throw (InvalidOperationException)new ConflictBaseException();
+
+// Generated exception will have:
+// public sealed class ConflictBaseException : ConflictingType { }
+```
+
+Since `ConflictingType` doesn't exist, this will result in a compilation error, prompting you to use a consistent base class.
