@@ -10,7 +10,7 @@ namespace TestApp
             {
                 throw new HelloWorldException();
             }
-            catch (HelloWorldException ex)
+            catch (HelloWorldException)
             {
                 try
                 {
@@ -21,6 +21,27 @@ namespace TestApp
                     throw new WrappedException("Wrapped error", ex2);
                 }
             }
+        }
+
+        // Test method for init-only properties
+        private static void TestInitProperties()
+        {
+            // Test with string property
+            throw new StupidUserException
+            {
+                Name = "Bambang"
+            };
+        }
+
+        // Test method for multiple properties
+        private static void TestMultipleProperties()
+        {
+            throw new PropertyTestException
+            {
+                UserId = 42,
+                UserName = "TestUser",
+                IsActive = true
+            };
         }
     }
 }
