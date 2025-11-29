@@ -369,6 +369,236 @@ public class ExceptionGeneratorTests
         generatedCode.ShouldContain("public string? Reason { get; init; }");
     }
 
+    [Fact]
+    public void GeneratesExceptionWithExplicitCastBaseClass()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (ArgumentException)new StupidUserException("That's not how you use it", "name");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with ArgumentException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("StupidUserException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class StupidUserException : ArgumentException");
+        // Verify ArgumentException constructors are generated
+        generatedCode.ShouldContain("public StupidUserException() : base() { }");
+        generatedCode.ShouldContain("public StupidUserException(string? message) : base(message) { }");
+        generatedCode.ShouldContain("public StupidUserException(string? message, Exception? innerException) : base(message, innerException) { }");
+        generatedCode.ShouldContain("public StupidUserException(string? message, string? paramName) : base(message, paramName) { }");
+        generatedCode.ShouldContain("public StupidUserException(string? message, string? paramName, Exception? innerException) : base(message, paramName, innerException) { }");
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithConflictingBaseClasses()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod1()
+                    {
+                        throw (ArgumentException)new ConflictBaseException();
+                    }
+
+                    public void TestMethod2()
+                    {
+                        throw (InvalidOperationException)new ConflictBaseException();
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception has ConflictingType as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("ConflictBaseException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class ConflictBaseException : ConflictingType");
+
+        // Assert - Compilation should fail because ConflictingType doesn't exist
+        var compilationDiagnostics = compilation.GetDiagnostics();
+        compilationDiagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldNotBeEmpty();
+        compilationDiagnostics.ShouldContain(d => d.Id == "CS0246" && d.GetMessage().Contains("ConflictingType"));
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithExplicitCastInThrowExpression()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public string GetValue(string? input) =>
+                        input ?? throw (InvalidOperationException)new MissingInputException("input cannot be null");
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with InvalidOperationException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("MissingInputException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class MissingInputException : InvalidOperationException");
+        generatedCode.ShouldContain("public MissingInputException(string? message) : base(message) { }");
+    }
+
+    [Fact]
+    public void MergesBaseClassWithNonCastUsage()
+    {
+        // Arrange - one usage has cast, another doesn't
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod1()
+                    {
+                        throw (ArgumentException)new MixedUsageException("error", "param");
+                    }
+
+                    public void TestMethod2()
+                    {
+                        throw new MixedUsageException();
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception uses the base class from the cast
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("MixedUsageException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class MixedUsageException : ArgumentException");
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithArgumentNullExceptionBase()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod(string name)
+                    {
+                        if (name == null)
+                            throw (ArgumentNullException)new NameRequiredException("name");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception exists with ArgumentNullException as base class
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("NameRequiredException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class NameRequiredException : ArgumentNullException");
+        // Verify ArgumentNullException constructors are generated
+        generatedCode.ShouldContain("public NameRequiredException() : base() { }");
+        generatedCode.ShouldContain("public NameRequiredException(string? paramName) : base(paramName) { }");
+        generatedCode.ShouldContain("public NameRequiredException(string? message, Exception? innerException) : base(message, innerException) { }");
+        generatedCode.ShouldContain("public NameRequiredException(string? paramName, string? message) : base(paramName, message) { }");
+    }
+
+    [Fact]
+    public void GeneratesExceptionWithCastAndProperties()
+    {
+        // Arrange
+        string source = """
+            using System;
+            namespace TestCode
+            {
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        throw (ArgumentException)new DetailedArgumentException("error", "param")
+                        {
+                            FieldName = "username",
+                            AttemptedValue = 42
+                        };
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var (compilation, diagnostics) = RunGenerator(source);
+
+        // Assert - Generator diagnostics should be empty (generator ran successfully)
+        diagnostics.ShouldBeEmpty();
+
+        // Verify the generated exception has both base class and properties
+        var generatedSyntaxTree = compilation.SyntaxTrees
+            .FirstOrDefault(st => st.FilePath.Contains("DetailedArgumentException"));
+        generatedSyntaxTree.ShouldNotBeNull();
+
+        string generatedCode = generatedSyntaxTree.GetText().ToString();
+        generatedCode.ShouldContain("public sealed class DetailedArgumentException : ArgumentException");
+        generatedCode.ShouldContain("public string? FieldName { get; init; }");
+        generatedCode.ShouldContain("public int? AttemptedValue { get; init; }");
+    }
+
     private static (Compilation, ImmutableArray<Diagnostic>) RunGenerator(string source)
     {
         SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source);

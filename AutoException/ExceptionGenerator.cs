@@ -29,20 +29,22 @@ namespace RG.AutoException
             public override int GetHashCode() => (Name, TypeName).GetHashCode();
         }
 
-        // Represents exception info including its properties
+        // Represents exception info including its properties and base class
         private sealed class ExceptionInfo
         {
             public string Name { get; }
             public ImmutableArray<PropertyInfo> Properties { get; }
+            public string? BaseClassName { get; }
 
-            public ExceptionInfo(string name, ImmutableArray<PropertyInfo> properties)
+            public ExceptionInfo(string name, ImmutableArray<PropertyInfo> properties, string? baseClassName = null)
             {
                 Name = name;
                 Properties = properties;
+                BaseClassName = baseClassName;
             }
 
             public override bool Equals(object? obj) =>
-                obj is ExceptionInfo other && Name == other.Name && Properties.SequenceEqual(other.Properties);
+                obj is ExceptionInfo other && Name == other.Name && Properties.SequenceEqual(other.Properties) && BaseClassName == other.BaseClassName;
 
             public override int GetHashCode()
             {
@@ -51,7 +53,24 @@ namespace RG.AutoException
                 {
                     hash = (hash * 397) ^ prop.GetHashCode();
                 }
+                if (BaseClassName is not null)
+                {
+                    hash = (hash * 397) ^ BaseClassName.GetHashCode();
+                }
                 return hash;
+            }
+        }
+
+        // Represents information about base class constructors
+        private sealed class BaseClassConstructorInfo
+        {
+            public string Parameters { get; }
+            public string BaseCallArgs { get; }
+
+            public BaseClassConstructorInfo(string parameters, string baseCallArgs)
+            {
+                Parameters = parameters;
+                BaseCallArgs = baseCallArgs;
             }
         }
 
@@ -98,6 +117,8 @@ namespace RG.AutoException
                 foreach (ExceptionInfo exceptionInfo in exceptions)
                 {
                     string propertiesSource = GenerateProperties(exceptionInfo.Properties);
+                    string baseClassName = exceptionInfo.BaseClassName ?? "Exception";
+                    string constructors = GenerateConstructors(exceptionInfo.Name, baseClassName);
 
                     ctx.AddSource(
                         hintName: exceptionInfo.Name,
@@ -107,12 +128,9 @@ namespace RG.AutoException
 
                             namespace GeneratedExceptions
                             {
-                                public sealed class {{exceptionInfo.Name}} : Exception
+                                public sealed class {{exceptionInfo.Name}} : {{baseClassName}}
                                 {
-                                    public {{exceptionInfo.Name}}() : base() { }
-                                    public {{exceptionInfo.Name}}(string message) : base(message) { }
-                                    public {{exceptionInfo.Name}}(string message, Exception innerException) : base(message, innerException) { }
-                            {{propertiesSource}}
+                            {{constructors}}{{propertiesSource}}
                                 }
                             }
                             """,
@@ -130,6 +148,11 @@ namespace RG.AutoException
                     => HasValidArgumentCount(objectCreation),
                 ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax { Type: IdentifierNameSyntax } objectCreation }
                     => HasValidArgumentCount(objectCreation),
+                // Support explicit cast expressions: throw (ArgumentException)new MyException()
+                ThrowExpressionSyntax { Expression: CastExpressionSyntax { Expression: ObjectCreationExpressionSyntax { Type: IdentifierNameSyntax } objectCreation } }
+                    => HasValidArgumentCount(objectCreation),
+                ThrowStatementSyntax { Expression: CastExpressionSyntax { Expression: ObjectCreationExpressionSyntax { Type: IdentifierNameSyntax } objectCreation } }
+                    => HasValidArgumentCount(objectCreation),
                 _ => false
             };
         }
@@ -142,12 +165,34 @@ namespace RG.AutoException
 
         private static ExceptionInfo? GetExceptionInfo(GeneratorSyntaxContext context)
         {
-            ObjectCreationExpressionSyntax? objectCreation = context.Node switch
+            ObjectCreationExpressionSyntax? objectCreation = null;
+            CastExpressionSyntax? castExpression = null;
+
+            switch (context.Node)
             {
-                ThrowExpressionSyntax throwExpr => throwExpr.Expression as ObjectCreationExpressionSyntax,
-                ThrowStatementSyntax throwStmt => throwStmt.Expression as ObjectCreationExpressionSyntax,
-                _ => null
-            };
+                case ThrowExpressionSyntax throwExpr:
+                    if (throwExpr.Expression is CastExpressionSyntax castExpr1)
+                    {
+                        castExpression = castExpr1;
+                        objectCreation = castExpr1.Expression as ObjectCreationExpressionSyntax;
+                    }
+                    else
+                    {
+                        objectCreation = throwExpr.Expression as ObjectCreationExpressionSyntax;
+                    }
+                    break;
+                case ThrowStatementSyntax throwStmt:
+                    if (throwStmt.Expression is CastExpressionSyntax castExpr2)
+                    {
+                        castExpression = castExpr2;
+                        objectCreation = castExpr2.Expression as ObjectCreationExpressionSyntax;
+                    }
+                    else
+                    {
+                        objectCreation = throwStmt.Expression as ObjectCreationExpressionSyntax;
+                    }
+                    break;
+            }
 
             if (objectCreation?.Type is not IdentifierNameSyntax typeSyntax)
             {
@@ -164,10 +209,35 @@ namespace RG.AutoException
                 return null;
             }
 
+            // Extract base class from cast expression if present
+            string? baseClassName = null;
+            if (castExpression is not null)
+            {
+                ITypeSymbol? castType = context.SemanticModel.GetTypeInfo(castExpression.Type).Type;
+                if (castType is not null && IsExceptionType(castType))
+                {
+                    baseClassName = castType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                }
+            }
+
             // Extract properties from object initializer
             ImmutableArray<PropertyInfo> properties = ExtractProperties(objectCreation, context.SemanticModel);
 
-            return new ExceptionInfo(exceptionName, properties);
+            return new ExceptionInfo(exceptionName, properties, baseClassName);
+        }
+
+        private static bool IsExceptionType(ITypeSymbol type)
+        {
+            ITypeSymbol? current = type;
+            while (current is not null)
+            {
+                if (current.ToDisplayString() == "System.Exception")
+                {
+                    return true;
+                }
+                current = current.BaseType;
+            }
+            return false;
         }
 
         private static ImmutableArray<PropertyInfo> ExtractProperties(
@@ -263,7 +333,25 @@ namespace RG.AutoException
                         })
                         .ToImmutableArray();
 
-                    return new ExceptionInfo(name, allProperties);
+                    // Determine base class - check for conflicts
+                    var baseClasses = g
+                        .Select(e => e!.BaseClassName)
+                        .Where(b => b is not null)
+                        .Distinct()
+                        .ToList();
+
+                    string? baseClassName = null;
+                    if (baseClasses.Count == 1)
+                    {
+                        baseClassName = baseClasses[0];
+                    }
+                    else if (baseClasses.Count > 1)
+                    {
+                        // Conflicting base classes
+                        baseClassName = "ConflictingType";
+                    }
+
+                    return new ExceptionInfo(name, allProperties, baseClassName);
                 })
                 .ToImmutableArray();
 
@@ -285,6 +373,99 @@ namespace RG.AutoException
             }
 
             return sb.ToString().TrimEnd();
+        }
+
+        private static string GenerateConstructors(string exceptionName, string baseClassName)
+        {
+            var sb = new StringBuilder();
+            var constructors = GetConstructorsForBaseClass(baseClassName);
+
+            foreach (var ctor in constructors)
+            {
+                sb.AppendLine($"        public {exceptionName}({ctor.Parameters}) : base({ctor.BaseCallArgs}) {{ }}");
+            }
+
+            return sb.ToString().TrimEnd('\r', '\n');
+        }
+
+        private static ImmutableArray<BaseClassConstructorInfo> GetConstructorsForBaseClass(string baseClassName)
+        {
+            // Define constructors for known exception types
+            // For unknown types, fall back to standard Exception constructors
+            return baseClassName switch
+            {
+                "ArgumentException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException"),
+                    new BaseClassConstructorInfo("string? message, string? paramName", "message, paramName"),
+                    new BaseClassConstructorInfo("string? message, string? paramName, Exception? innerException", "message, paramName, innerException")
+                ),
+                "ArgumentNullException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? paramName", "paramName"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException"),
+                    new BaseClassConstructorInfo("string? paramName, string? message", "paramName, message")
+                ),
+                "ArgumentOutOfRangeException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? paramName", "paramName"),
+                    new BaseClassConstructorInfo("string? paramName, string? message", "paramName, message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException"),
+                    new BaseClassConstructorInfo("string? paramName, object? actualValue, string? message", "paramName, actualValue, message")
+                ),
+                "InvalidOperationException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "NotSupportedException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "NotImplementedException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "FormatException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "KeyNotFoundException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "IndexOutOfRangeException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "NullReferenceException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "ApplicationException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                "SystemException" => ImmutableArray.Create(
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string? message", "message"),
+                    new BaseClassConstructorInfo("string? message, Exception? innerException", "message, innerException")
+                ),
+                _ => ImmutableArray.Create(
+                    // Default constructors for Exception or unknown types
+                    new BaseClassConstructorInfo("", ""),
+                    new BaseClassConstructorInfo("string message", "message"),
+                    new BaseClassConstructorInfo("string message, Exception innerException", "message, innerException")
+                )
+            };
         }
     }
 }
