@@ -1,48 +1,86 @@
-﻿using RG.AutoException.Internals;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System.Diagnostics;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 
 namespace RG.AutoException
 {
     [Generator]
-    public class ExceptionGenerator : ISourceGenerator
+    public class ExceptionGenerator : IIncrementalGenerator
     {
-        public void Initialize(GeneratorInitializationContext context)
+        public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-#if DEBUG
-            if (!Debugger.IsAttached)
+            // Find all throw expressions and statements with potential missing exceptions
+            IncrementalValuesProvider<string> missingExceptions = context.SyntaxProvider
+                .CreateSyntaxProvider(
+                    predicate: static (node, _) => IsThrowWithObjectCreation(node),
+                    transform: static (ctx, _) => GetMissingExceptionName(ctx))
+                .Where(static name => name is not null)!;
+
+            // Collect unique exception names
+            IncrementalValueProvider<ImmutableArray<string>> uniqueExceptions = missingExceptions
+                .Collect()
+                .Select(static (names, _) => names.Distinct().ToImmutableArray());
+
+            // Register the source output
+            context.RegisterSourceOutput(uniqueExceptions, static (ctx, exceptions) =>
             {
-                Debugger.Launch();
-            }
-#endif
-            context.RegisterForSyntaxNotifications(() => new ThrowSyntaxReceiver());
+                foreach (string exceptionName in exceptions)
+                {
+                    ctx.AddSource(
+                        hintName: exceptionName,
+                        sourceText: SourceText.From(
+                            $$"""
+                            using System;
+
+                            namespace GeneratedExceptions
+                            {
+                                public sealed class {{exceptionName}} : Exception { }
+                            }
+                            """,
+                            encoding: Encoding.UTF8
+                        ));
+                }
+            });
         }
 
-        public void Execute(GeneratorExecutionContext context)
+        private static bool IsThrowWithObjectCreation(SyntaxNode node)
         {
-            if (context.SyntaxContextReceiver is not ThrowSyntaxReceiver receiver)
+            return node switch
             {
-                return;
+                ThrowExpressionSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Type: IdentifierNameSyntax } } => true,
+                ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Type: IdentifierNameSyntax } } => true,
+                _ => false
+            };
+        }
+
+        private static string? GetMissingExceptionName(GeneratorSyntaxContext context)
+        {
+            ObjectCreationExpressionSyntax? objectCreation = context.Node switch
+            {
+                ThrowExpressionSyntax throwExpr => throwExpr.Expression as ObjectCreationExpressionSyntax,
+                ThrowStatementSyntax throwStmt => throwStmt.Expression as ObjectCreationExpressionSyntax,
+                _ => null
+            };
+
+            if (objectCreation?.Type is not IdentifierNameSyntax typeSyntax)
+            {
+                return null;
             }
 
-            foreach (string exceptionName in receiver.MissingExceptions)
-            {
-                context.AddSource(
-                    hintName: exceptionName,
-                    sourceText: SourceText.From(
-                        $$"""
-                        using System;
+            string exceptionName = typeSyntax.Identifier.ValueText;
 
-                        namespace GeneratedExceptions
-                        {
-                            public sealed class {{exceptionName}} : Exception { }
-                        }
-                        """,
-                        encoding: Encoding.UTF8
-                    ));
+            // Check if it's a valid exception name and symbol is not found
+            if (exceptionName.EndsWith("Exception")
+                && !exceptionName.Contains(".")
+                && context.SemanticModel.GetSymbolInfo(typeSyntax).Symbol is null)
+            {
+                return exceptionName;
             }
+
+            return null;
         }
     }
 }
