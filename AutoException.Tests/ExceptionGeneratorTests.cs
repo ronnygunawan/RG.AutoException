@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using RG.AutoException;
+using Shouldly;
 
 namespace AutoException.Tests;
 
@@ -28,18 +29,18 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception exists
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("MyTestException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class MyTestException : Exception", generatedCode);
-        Assert.Contains("public MyTestException() : base() { }", generatedCode);
-        Assert.Contains("public MyTestException(string message) : base(message) { }", generatedCode);
-        Assert.Contains("public MyTestException(string message, Exception innerException) : base(message, innerException) { }", generatedCode);
+        generatedCode.ShouldContain("public sealed class MyTestException : Exception");
+        generatedCode.ShouldContain("public MyTestException() : base() { }");
+        generatedCode.ShouldContain("public MyTestException(string message) : base(message) { }");
+        generatedCode.ShouldContain("public MyTestException(string message, Exception innerException) : base(message, innerException) { }");
     }
 
     [Fact]
@@ -66,16 +67,16 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception has the property
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("StupidUserException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class StupidUserException : Exception", generatedCode);
-        Assert.Contains("public string? Name { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public sealed class StupidUserException : Exception");
+        generatedCode.ShouldContain("public string? Name { get; init; }");
     }
 
     [Fact]
@@ -104,18 +105,18 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception has all properties
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("MultiPropException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class MultiPropException : Exception", generatedCode);
-        Assert.Contains("public int? UserId { get; init; }", generatedCode);
-        Assert.Contains("public string? UserName { get; init; }", generatedCode);
-        Assert.Contains("public bool? IsActive { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public sealed class MultiPropException : Exception");
+        generatedCode.ShouldContain("public int? UserId { get; init; }");
+        generatedCode.ShouldContain("public string? UserName { get; init; }");
+        generatedCode.ShouldContain("public bool? IsActive { get; init; }");
     }
 
     [Fact]
@@ -150,17 +151,17 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception has merged properties
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("MergedPropsException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class MergedPropsException : Exception", generatedCode);
-        Assert.Contains("public string? Name { get; init; }", generatedCode);
-        Assert.Contains("public int? Age { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public sealed class MergedPropsException : Exception");
+        generatedCode.ShouldContain("public string? Name { get; init; }");
+        generatedCode.ShouldContain("public int? Age { get; init; }");
     }
 
     [Fact]
@@ -198,19 +199,19 @@ public class ExceptionGeneratorTests
         // but the generated code should contain ConflictingType
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class ConflictException : Exception", generatedCode);
-        Assert.Contains("public ConflictingType? Id { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public sealed class ConflictException : Exception");
+        generatedCode.ShouldContain("public ConflictingType? Id { get; init; }");
 
         // Verify ConflictingType is also generated
         var conflictingTypeSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ConflictingType") && !st.FilePath.Contains("ConflictException"));
-        Assert.NotNull(conflictingTypeSyntaxTree);
+        conflictingTypeSyntaxTree.ShouldNotBeNull();
 
         string conflictingTypeCode = conflictingTypeSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class ConflictingType", conflictingTypeCode);
+        conflictingTypeCode.ShouldContain("public sealed class ConflictingType");
     }
 
     [Fact]
@@ -244,21 +245,21 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception has all primitive type properties
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("PrimitiveTypesException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public int? IntValue { get; init; }", generatedCode);
-        Assert.Contains("public long? LongValue { get; init; }", generatedCode);
-        Assert.Contains("public double? DoubleValue { get; init; }", generatedCode);
-        Assert.Contains("public decimal? DecimalValue { get; init; }", generatedCode);
-        Assert.Contains("public bool? BoolValue { get; init; }", generatedCode);
-        Assert.Contains("public char? CharValue { get; init; }", generatedCode);
-        Assert.Contains("public string? StringValue { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public int? IntValue { get; init; }");
+        generatedCode.ShouldContain("public long? LongValue { get; init; }");
+        generatedCode.ShouldContain("public double? DoubleValue { get; init; }");
+        generatedCode.ShouldContain("public decimal? DecimalValue { get; init; }");
+        generatedCode.ShouldContain("public bool? BoolValue { get; init; }");
+        generatedCode.ShouldContain("public char? CharValue { get; init; }");
+        generatedCode.ShouldContain("public string? StringValue { get; init; }");
     }
 
     [Fact]
@@ -287,17 +288,17 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception only has the primitive property
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("NonPrimitiveException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public string? Name { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public string? Name { get; init; }");
         // Should not contain any property for the non-primitive type
-        Assert.DoesNotContain("SomeClass", generatedCode);
+        generatedCode.ShouldNotContain("SomeClass");
     }
 
     [Fact]
@@ -322,12 +323,12 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify no exception was generated for ArgumentException
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ArgumentException") && st.FilePath.Contains(".g.cs"));
-        Assert.Null(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldBeNull();
     }
 
     [Fact]
@@ -349,16 +350,16 @@ public class ExceptionGeneratorTests
         var (compilation, diagnostics) = RunGenerator(source);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ShouldBeEmpty();
 
         // Verify the generated exception exists with property
         var generatedSyntaxTree = compilation.SyntaxTrees
             .FirstOrDefault(st => st.FilePath.Contains("ThrowExprException"));
-        Assert.NotNull(generatedSyntaxTree);
+        generatedSyntaxTree.ShouldNotBeNull();
 
         string generatedCode = generatedSyntaxTree.GetText().ToString();
-        Assert.Contains("public sealed class ThrowExprException : Exception", generatedCode);
-        Assert.Contains("public string? Reason { get; init; }", generatedCode);
+        generatedCode.ShouldContain("public sealed class ThrowExprException : Exception");
+        generatedCode.ShouldContain("public string? Reason { get; init; }");
     }
 
     private static (Compilation, ImmutableArray<Diagnostic>) RunGenerator(string source)
