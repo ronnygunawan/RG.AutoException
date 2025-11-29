@@ -291,11 +291,12 @@ namespace RG.AutoException
                 SpecialType.System_Boolean => "bool",
                 SpecialType.System_Char => "char",
                 SpecialType.System_Object => "object",
-                _ => typeSymbol.Name
+                _ => typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
             };
 
             // Add nullable modifier for reference types
-            if (typeSymbol.IsReferenceType)
+            // We always add ? for reference types to match modern C# nullable annotations
+            if (typeSymbol.IsReferenceType && !baseName.EndsWith("?"))
             {
                 return baseName + "?";
             }
@@ -455,23 +456,23 @@ namespace RG.AutoException
             return sb.ToString().TrimEnd();
         }
 
+        // Default constructors for Exception base class when no cast expression is used
+        private static readonly ImmutableArray<ConstructorInfo> DefaultExceptionConstructors = ImmutableArray.Create(
+            new ConstructorInfo("", ""),
+            new ConstructorInfo("string? message", "message"),
+            new ConstructorInfo("string? message, Exception? innerException", "message, innerException")
+        );
+
         private static string GenerateConstructors(string exceptionName, ImmutableArray<ConstructorInfo> constructors)
         {
             var sb = new StringBuilder();
 
             // If no constructors were extracted (no cast expression), use default Exception constructors
-            if (constructors.IsEmpty)
+            var ctorsToGenerate = constructors.IsEmpty ? DefaultExceptionConstructors : constructors;
+
+            foreach (var ctor in ctorsToGenerate)
             {
-                sb.AppendLine($"        public {exceptionName}() : base() {{ }}");
-                sb.AppendLine($"        public {exceptionName}(string? message) : base(message) {{ }}");
-                sb.AppendLine($"        public {exceptionName}(string? message, Exception? innerException) : base(message, innerException) {{ }}");
-            }
-            else
-            {
-                foreach (var ctor in constructors)
-                {
-                    sb.AppendLine($"        public {exceptionName}({ctor.Parameters}) : base({ctor.BaseCallArgs}) {{ }}");
-                }
+                sb.AppendLine($"        public {exceptionName}({ctor.Parameters}) : base({ctor.BaseCallArgs}) {{ }}");
             }
 
             return sb.ToString().TrimEnd('\r', '\n');

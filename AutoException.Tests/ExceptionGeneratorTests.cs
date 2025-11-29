@@ -671,7 +671,8 @@ public class ExceptionGeneratorTests
         // InvalidProgramException has basic constructors - dynamically extracted from the actual type
         generatedCode.ShouldContain("public CorruptedStateException() : base() { }");
         generatedCode.ShouldContain("public CorruptedStateException(string? message) : base(message) { }");
-        // Note: InvalidProgramException does not have a (string, Exception) constructor in .NET
+        // InvalidProgramException does not have a (string, Exception) constructor in .NET
+        generatedCode.ShouldNotContain("public CorruptedStateException(string? message, Exception? innerException)");
     }
 
     [Fact]
